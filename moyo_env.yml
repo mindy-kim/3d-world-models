@@ -1,5 +1,6 @@
 name: moyo
 channels:
+  - anaconda
   - conda-forge
 dependencies:
   - anyio=4.9.0=pyh29332c3_0
@@ -38,6 +39,7 @@ dependencies:
   - fqdn=1.5.1=pyhd8ed1ab_1
   - freetype=2.13.3=h1d14073_0
   - fsspec=2025.3.2=pyhd8ed1ab_0
+  - future=1.0.0=py39hca03da5_0
   - giflib=5.2.2=h93a5062_0
   - gmp=6.3.0=h7bae524_2
   - gmpy2=2.1.5=py39h478d0be_3
@@ -221,7 +223,7 @@ dependencies:
       - opencv-python==4.11.0.86
       - pandas==2.2.3
       - protobuf==6.30.2
-      - pyglet==1.4.0b1
+      - pyglet==1.5.27
       - pyopengl==3.1.0
       - pyparsing==3.2.3
       - pyrender==0.1.45
