@@ -13,7 +13,7 @@ from moyo.utils.constants import ESSENTIALS_DIR, MOYO_V_TEMPLATE
 def smplx_breakdown(bdata, device):
     num_frames = len(bdata['trans'])
 
-    bdata['poses'] = bdata['fullpose']
+    if 'poses' not in bdata: bdata['poses'] = bdata['fullpose']
 
     global_orient = torch.from_numpy(bdata['poses'][:, :3]).float().to(device)
     body_pose = torch.from_numpy(bdata['poses'][:, 3:66]).float().to(device)
