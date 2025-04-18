@@ -1,0 +1,16 @@
+[tool.poetry]
+name = "moyo"
+version = "0.1.0"
+description = ""
+authors = ["Shashank Tripathi <shashank.tripathi@tuebingen.mpg.de>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.9"
+loguru = "^0.7.0"
+clint = "^0.5.1"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
