@@ -9,12 +9,14 @@ from human_body_prior.tools.omni_tools import copy2cpu as c2c
 from os import path as osp
 from PIL import Image
 import io
+from fibonacci_sphere import *
+import time
 
-support_dir = './data'
+support_dir = 'data'
 
 # Choose the device to run the body model on.
 comp_device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-comp_device
+# comp_device
 
 amass_npz_fname = osp.join(support_dir, 'YOGI_2_latest_smplx_neutral/train/220923_yogi_body_hands_03596_Boat_Pose_or_Paripurna_Navasana_-a_stageii.npz') # the path to body data
 bdata = np.load(amass_npz_fname)
@@ -63,10 +65,15 @@ subj_id = 'unknown'
 pp_body_model_output, smplx_params, transls, faces = smplx_to_mesh(pp_params, f'{support_dir}/models_lockedhead/smplx/SMPLX_NEUTRAL.npz','smplx', gender=gender)
 
 pp_mesh = visualize_mesh(pp_body_model_output, faces, frame_id=550)
-scene = trimesh.scene.scene.Scene(pp_mesh)
 
-scene.set_camera(angles=(2,2,2), distance=5)
-png = scene.save_image()
-image = Image.open(io.BytesIO(png))
-image.save("./sample.png")
+viewpoints = fibonacci_sphere(60)
+
+for view in viewpoints:
+    scene = trimesh.scene.scene.Scene(pp_mesh)
+    scene.set_camera(angles=view, distance=2)
+    png = scene.save_image()
+    with Image.open(io.BytesIO(png)) as img:
+        time.sleep(1)
+    # scene.reset()
+# image.save("./sample.png")
 # print(f"PNG file saved as {"./sample.png"}")

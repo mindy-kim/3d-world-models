@@ -1,3 +1,5 @@
+import numpy as np
+
 # Sample uniformly on a sphere
 def fibonacci_sphere(samples=100):
     points = []
