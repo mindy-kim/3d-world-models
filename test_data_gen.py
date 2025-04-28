@@ -35,11 +35,16 @@ def write_cameras_txt(out_path, width, height, fx):
         f.write(f"1 SIMPLE_RADIAL {width} {height} {fx} {cx} {cy} 0\n")
 
 # Util to sample and write points3D.txt from mesh
-def write_points3D_txt(mesh_path, out_path, num_points=10000):
+def write_points3D_txt(face_ind_path, mesh_path, out_path, num_points=10000):
     mesh = trimesh.load(mesh_path, process=False)
-    # wtf is face_indices
-    points, face_indices = trimesh.sample.sample_surface(mesh, num_points)
     colors = np.tile(np.array([[200, 150, 120]]), (num_points, 1))
+
+    if os.path.exists(face_ind_path):
+        face_indices = np.load(face_ind_path, np.array(face_indices))
+        points = mesh[face_indices]
+    else:
+        points, face_indices = trimesh.sample.sample_surface(mesh, num_points, 0)
+        np.save(face_ind_path, np.array(face_indices))
     
     with open(out_path, 'w') as f:
         f.write("# POINT3D_ID, X, Y, Z, R, G, B, ERROR, TRACK[]\n")
@@ -59,6 +64,7 @@ def export_to_colmap_format(pose_name: str, video_name: str):
     pose_out_dir = os.path.join(support_dir, f"{pose_name}/{video_name}/colmap_scene/poses")
     sparse_dir = os.path.join(support_dir, f"{pose_name}/{video_name}/colmap_scene/sparse/0") # camera's intrinsic + extrinsic params in txt format
     mesh_dir = os.path.join(support_dir, f"{pose_name}/{video_name}/moyo_mesh")
+    face_ind_dir = os.path.join(support_dir, f"face_inds")
 
     os.makedirs(image_out_dir, exist_ok=True)
     os.makedirs(pose_out_dir, exist_ok=True)
@@ -113,7 +119,7 @@ def export_to_colmap_format(pose_name: str, video_name: str):
         # Write COLMAP format files
         write_images_txt(image_out_dir, pose_out_dir, os.path.join(sparse_dir, "images.txt"))
         write_cameras_txt(os.path.join(sparse_dir, "cameras.txt"), width, height, fx)
-        write_points3D_txt(mesh_path, os.path.join(sparse_dir, "points3D.txt")) # find what the face indices are?
+        write_points3D_txt(face_ind_dir, mesh_path, os.path.join(sparse_dir, "points3D.txt")) # find what the face indices are?
 
-if __name__ == "__main__":
-    export_to_colmap_format()
+# if __name__ == "__main__":
+#     export_to_colmap_format()
