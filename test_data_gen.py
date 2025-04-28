@@ -48,73 +48,72 @@ def write_points3D_txt(mesh_path, out_path, num_points=10000):
             f.write(f"{i+1} {pt[0]} {pt[1]} {pt[2]} {int(r)} {int(g)} {int(b)} 0.01\n")
 
 # Main processing
-def export_to_colmap_format():
+def export_to_colmap_format(pose_name: str, video_name: str):
     viewpoints = fibonacci_sphere(100)
     support_dir = 'data'
     data_folder = "mosh/train/"
     width, height = 512, 512
     fov = np.pi / 3
     fx = width / (2 * np.tan(fov / 2))
-    image_out_dir = os.path.join(support_dir, "colmap_scene/images")
-    pose_out_dir = os.path.join(support_dir, "colmap_scene/poses")
-    sparse_dir = os.path.join(support_dir, "colmap_scene/sparse/0") # camera's intrinsic + extrinsic params in txt format
-    mesh_dir = os.path.join(support_dir, "moyo_mesh")
+    image_out_dir = os.path.join(support_dir, f"{pose_name}/{video_name}/colmap_scene/images")
+    pose_out_dir = os.path.join(support_dir, f"{pose_name}/{video_name}/colmap_scene/poses")
+    sparse_dir = os.path.join(support_dir, f"{pose_name}/{video_name}/colmap_scene/sparse/0") # camera's intrinsic + extrinsic params in txt format
+    mesh_dir = os.path.join(support_dir, f"{pose_name}/{video_name}/moyo_mesh")
 
     os.makedirs(image_out_dir, exist_ok=True)
     os.makedirs(pose_out_dir, exist_ok=True)
     os.makedirs(sparse_dir, exist_ok=True)
 
     # read in poses
-    for pose_file in os.listdir(f"{support_dir}/{data_folder}")[:1]:
-        pose_name = os.path.splitext(pose_file)[0].split("_", 1)[1]
-        if pose_file.endswith(".pkl"):
-            pp_params = pkl.load(open(f"{support_dir}/{data_folder}/{pose_file}", 'rb'))
-            num_frames = len(pp_params['fullpose'])
-        else:
-            pp_params = np.load(pose_file)
-            num_frames = len(pp_params['poses'])
+    pose_file = os.path.join(support_dir, f"{data_folder}/{pose_name}/{video_name}")
+    if pose_file.endswith(".pkl"):
+        pp_params = pkl.load(open(pose_file, 'rb'))
+        num_frames = len(pp_params['fullpose'])
+    else:
+        pp_params = np.load(pose_file)
+        num_frames = len(pp_params['poses'])
 
-        gender = 'neutral'
-        pp_body_model_output, _, _, faces = smplx_to_mesh(
-            pp_params,
-            f'{support_dir}/models_lockedhead/smplx/SMPLX_NEUTRAL.npz',
-            'smplx',
-            gender=gender
-        )
+    gender = 'neutral'
+    pp_body_model_output, _, _, faces = smplx_to_mesh(
+        pp_params,
+        f'{support_dir}/models_lockedhead/smplx/SMPLX_NEUTRAL.npz',
+        'smplx',
+        gender=gender
+    )
 
-        # get mesh per frame
-        for frame_ind in tqdm(range(num_frames)[200:201]):
-            pp_mesh = visualize_mesh(pp_body_model_output, faces, frame_id=frame_ind)
-            mesh_path = os.path.join(mesh_dir, f"{pose_name}_t{frame_ind}.ply")
-            pp_mesh.export(mesh_path)
-            
-            # get viewpoints (fib sphere) for given timestep
-            for i, view in enumerate(viewpoints):
-                eye = view * 2.0
-                forward = np.array([0, 1, 0]) - eye
-                forward /= np.linalg.norm(forward)
-                right = np.cross(np.array([0, 1, 0]), forward)
-                up = np.cross(forward, right)
-                cam_to_world = np.eye(4)
-                cam_to_world[:3, 0] = right
-                cam_to_world[:3, 1] = up
-                cam_to_world[:3, 2] = forward
-                cam_to_world[:3, 3] = eye
+    # get mesh per frame
+    for frame_ind in tqdm(range(num_frames)[50:-50:10]):
+        pp_mesh = visualize_mesh(pp_body_model_output, faces, frame_id=frame_ind)
+        mesh_path = os.path.join(mesh_dir, f"{pose_name}_t{frame_ind}.ply")
+        pp_mesh.export(mesh_path)
+        
+        # get viewpoints (fib sphere) for given timestep
+        for i, view in enumerate(viewpoints):
+            eye = view * 2.0
+            forward = np.array([0, 1, 0]) - eye
+            forward /= np.linalg.norm(forward)
+            right = np.cross(np.array([0, 1, 0]), forward)
+            up = np.cross(forward, right)
+            cam_to_world = np.eye(4)
+            cam_to_world[:3, 0] = right
+            cam_to_world[:3, 1] = up
+            cam_to_world[:3, 2] = forward
+            cam_to_world[:3, 3] = eye
 
-                np.save(os.path.join(pose_out_dir, f"{i:06d}.npy"), cam_to_world)
+            np.save(os.path.join(pose_out_dir, f"{i:06d}.npy"), cam_to_world)
 
-                # Render and save image
-                scene = trimesh.Scene(pp_mesh)
-                scene.set_camera(angles=view, distance=2)
-                png = scene.save_image(resolution=(width, height))
-                img_path = os.path.join(image_out_dir, f"{i:06d}.png")
-                with Image.open(io.BytesIO(png)) as img:
-                    img.save(img_path)
+            # Render and save image
+            scene = trimesh.Scene(pp_mesh)
+            scene.set_camera(angles=view, distance=2)
+            png = scene.save_image(resolution=(width, height))
+            img_path = os.path.join(image_out_dir, f"{i:06d}.png")
+            with Image.open(io.BytesIO(png)) as img:
+                img.save(img_path)
 
-            # Write COLMAP format files
-            write_images_txt(image_out_dir, pose_out_dir, os.path.join(sparse_dir, "images.txt"))
-            write_cameras_txt(os.path.join(sparse_dir, "cameras.txt"), width, height, fx)
-            write_points3D_txt(mesh_path, os.path.join(sparse_dir, "points3D.txt")) # find what the face indices are?
+        # Write COLMAP format files
+        write_images_txt(image_out_dir, pose_out_dir, os.path.join(sparse_dir, "images.txt"))
+        write_cameras_txt(os.path.join(sparse_dir, "cameras.txt"), width, height, fx)
+        write_points3D_txt(mesh_path, os.path.join(sparse_dir, "points3D.txt")) # find what the face indices are?
 
 if __name__ == "__main__":
     export_to_colmap_format()

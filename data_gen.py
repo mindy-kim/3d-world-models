@@ -42,5 +42,6 @@ def main():
                 png = scene.save_image()
                 with Image.open(io.BytesIO(png)) as img:
                     img.save(f"{support_dir}/moyo_png/{pose_name}___t{frame_ind}_v{'_'.join(list(map(str,view)))}.png") # 3 _'s
+                    
 if __name__ == "__main__":
     main()
