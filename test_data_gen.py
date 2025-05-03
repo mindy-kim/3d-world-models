@@ -39,12 +39,17 @@ def write_points3D_txt(face_ind_path, mesh_path, out_path, num_points=10000):
     mesh = trimesh.load(mesh_path, process=False)
     colors = np.tile(np.array([[200, 150, 120]]), (num_points, 1))
 
-    if os.path.exists(face_ind_path):
-        face_indices = np.load(face_ind_path, np.array(face_indices))
-        points = mesh[face_indices]
-    else:
-        points, face_indices = trimesh.sample.sample_surface(mesh, num_points, 0)
-        np.save(face_ind_path, np.array(face_indices))
+    # if os.path.exists(face_ind_path):
+    #     face_indices = np.load(face_ind_path, np.array(face_indices))
+    #     points = mesh[face_indices]
+    # else:
+    points, face_indices = trimesh.sample.sample_surface(mesh, num_points)
+    print(face_indices)
+    face_indices = np.array(face_indices)
+    print(face_indices.shape)
+    print(np.unique(face_indices).shape)
+    np.save(face_ind_path, face_indices)
+
     
     with open(out_path, 'w') as f:
         f.write("# POINT3D_ID, X, Y, Z, R, G, B, ERROR, TRACK[]\n")
@@ -60,18 +65,26 @@ def export_to_colmap_format(pose_name: str, video_name: str):
     width, height = 512, 512
     fov = np.pi / 3
     fx = width / (2 * np.tan(fov / 2))
+    
     image_out_dir = os.path.join(support_dir, f"{pose_name}/{video_name}/colmap_scene/images")
     pose_out_dir = os.path.join(support_dir, f"{pose_name}/{video_name}/colmap_scene/poses")
     sparse_dir = os.path.join(support_dir, f"{pose_name}/{video_name}/colmap_scene/sparse/0") # camera's intrinsic + extrinsic params in txt format
     mesh_dir = os.path.join(support_dir, f"{pose_name}/{video_name}/moyo_mesh")
     face_ind_dir = os.path.join(support_dir, f"face_inds")
 
-    os.makedirs(image_out_dir, exist_ok=True)
-    os.makedirs(pose_out_dir, exist_ok=True)
-    os.makedirs(sparse_dir, exist_ok=True)
+    if not os.path.exists(image_out_dir): 
+        os.makedirs(image_out_dir, exist_ok=True)
+    if not os.path.exists(pose_out_dir): 
+        os.makedirs(pose_out_dir, exist_ok=True)
+    if not os.path.exists(sparse_dir): 
+        os.makedirs(sparse_dir, exist_ok=True)
+    if not os.path.exists(mesh_dir): 
+        os.makedirs(mesh_dir, exist_ok=True)
+    if not os.path.exists(face_ind_dir): 
+        os.makedirs(face_ind_dir, exist_ok=True)
 
     # read in poses
-    pose_file = os.path.join(support_dir, f"{data_folder}/{pose_name}/{video_name}")
+    pose_file = os.path.join(support_dir, f"{data_folder}/{pose_name}/{video_name}.pkl")
     if pose_file.endswith(".pkl"):
         pp_params = pkl.load(open(pose_file, 'rb'))
         num_frames = len(pp_params['fullpose'])
@@ -87,8 +100,11 @@ def export_to_colmap_format(pose_name: str, video_name: str):
         gender=gender
     )
 
+    face_inds = []
+
     # get mesh per frame
-    for frame_ind in tqdm(range(num_frames)[50:-50:10]):
+    # for frame_ind in tqdm(range(num_frames)[50:-50:10]):
+    for frame_ind in tqdm(range(num_frames)[100:102]):
         pp_mesh = visualize_mesh(pp_body_model_output, faces, frame_id=frame_ind)
         mesh_path = os.path.join(mesh_dir, f"{pose_name}_t{frame_ind}.ply")
         pp_mesh.export(mesh_path)
@@ -116,10 +132,24 @@ def export_to_colmap_format(pose_name: str, video_name: str):
             with Image.open(io.BytesIO(png)) as img:
                 img.save(img_path)
 
+        print('outside')
         # Write COLMAP format files
         write_images_txt(image_out_dir, pose_out_dir, os.path.join(sparse_dir, "images.txt"))
         write_cameras_txt(os.path.join(sparse_dir, "cameras.txt"), width, height, fx)
-        write_points3D_txt(face_ind_dir, mesh_path, os.path.join(sparse_dir, "points3D.txt")) # find what the face indices are?
+        # write_points3D_txt(face_ind_dir, mesh_path, os.path.join(sparse_dir, "points3D.txt")) # find what the face indices are?
+
+        mesh = trimesh.load(mesh_path, process=False)
+        colors = np.tile(np.array([[200, 150, 120]]), (10000, 1))
+        points, face_indices = trimesh.sample.sample_surface(mesh, 10000, 142)
+        face_indices = np.array(face_indices)
+        print(face_indices.shape)
+        print(np.unique(face_indices).shape)
+
+        if frame_ind == 101:
+            print(np.array_equal(face_indices, face_inds))
+        else:
+            face_inds = face_indices
+
 
 # if __name__ == "__main__":
 #     export_to_colmap_format()
