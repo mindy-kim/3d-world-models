@@ -102,9 +102,11 @@ def export_to_colmap_format(pose_name: str, video_name: str):
 
     face_inds = []
 
-    # get mesh per frame
-    # for frame_ind in tqdm(range(num_frames)[50:-50:10]):
-    for frame_ind in tqdm(range(num_frames)[100:102]):
+    # get mesh per fram
+    for frame_ind in tqdm(range(num_frames)[790:-50:10]):
+    # for frame_ind in tqdm(range(num_frames)[100:102]): #we'll probably have to tune this per video
+        # frame_ind += 
+        frames_from_start = (frame_ind - 50) // 10
         pp_mesh = visualize_mesh(pp_body_model_output, faces, frame_id=frame_ind)
         mesh_path = os.path.join(mesh_dir, f"{pose_name}_t{frame_ind}.ply")
         pp_mesh.export(mesh_path)
@@ -122,33 +124,39 @@ def export_to_colmap_format(pose_name: str, video_name: str):
             cam_to_world[:3, 2] = forward
             cam_to_world[:3, 3] = eye
 
-            np.save(os.path.join(pose_out_dir, f"{i:06d}.npy"), cam_to_world)
+            # pose_cam_dir = os.path.join(pose_out_dir, f"cam{i:02d}")
+            # os.makedirs(pose_cam_dir, exist_ok=True)
+            # np.save(os.path.join(pose_cam_dir, f"{i:06d}.npy"), cam_to_world)
 
             # Render and save image
             scene = trimesh.Scene(pp_mesh)
             scene.set_camera(angles=view, distance=2)
             png = scene.save_image(resolution=(width, height))
-            img_path = os.path.join(image_out_dir, f"{i:06d}.png")
+
+            img_cam_dir = os.path.join(image_out_dir, f"cam{i:02d}")
+            os.makedirs(img_cam_dir, exist_ok=True)
+            img_path = os.path.join(img_cam_dir, f"frame_{frames_from_start:05d}.jpg")
             with Image.open(io.BytesIO(png)) as img:
+                img = img.convert('RGB')
                 img.save(img_path)
 
         print('outside')
-        # Write COLMAP format files
-        write_images_txt(image_out_dir, pose_out_dir, os.path.join(sparse_dir, "images.txt"))
-        write_cameras_txt(os.path.join(sparse_dir, "cameras.txt"), width, height, fx)
-        # write_points3D_txt(face_ind_dir, mesh_path, os.path.join(sparse_dir, "points3D.txt")) # find what the face indices are?
+        # # Write COLMAP format files
+        # write_images_txt(image_out_dir, pose_out_dir, os.path.join(sparse_dir, "images.txt"))
+        # write_cameras_txt(os.path.join(sparse_dir, "cameras.txt"), width, height, fx)
+        # # write_points3D_txt(face_ind_dir, mesh_path, os.path.join(sparse_dir, "points3D.txt")) # find what the face indices are?
 
-        mesh = trimesh.load(mesh_path, process=False)
-        colors = np.tile(np.array([[200, 150, 120]]), (10000, 1))
-        points, face_indices = trimesh.sample.sample_surface(mesh, 10000, 142)
-        face_indices = np.array(face_indices)
-        print(face_indices.shape)
-        print(np.unique(face_indices).shape)
+        # mesh = trimesh.load(mesh_path, process=False)
+        # colors = np.tile(np.array([[200, 150, 120]]), (10000, 1))
+        # points, face_indices = trimesh.sample.sample_surface(mesh, 10000, 142)
+        # face_indices = np.array(face_indices)
+        # print(face_indices.shape)
+        # print(np.unique(face_indices).shape)
 
-        if frame_ind == 101:
-            print(np.array_equal(face_indices, face_inds))
-        else:
-            face_inds = face_indices
+        # if frame_ind == 101:
+        #     print(np.array_equal(face_indices, face_inds))
+        # else:
+        #     face_inds = face_indices
 
 
 # if __name__ == "__main__":
