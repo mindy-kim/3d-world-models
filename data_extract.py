@@ -1,5 +1,5 @@
 import os
-from test_data_gen import *
+from new_test_data_gen import *
 
 POSE_NAME = 'Boat_Pose'
 VIDEO_NAME = '221004_yogi_nexus_body_hands_03596_Boat_Pose_or_Paripurna_Navasana_-a_stageii'
