@@ -373,11 +373,11 @@ def rotation_matrix_lookat(target_dir, up_vector):
 
 
 # Main processing
-def json_to_4dgs_format(pose_name: str, video_name: str, old_json_file, new_json_file):
+def json_to_4dgs_format(pose_name: str, video_name: str, old_json_file, new_json_file, data_type):
     support_dir = './data'
     data_folder = "mosh/train/"
     
-    image_out_dir = os.path.join(support_dir, f"4dgs")
+    image_out_dir = os.path.join(support_dir, f"4dgs/{data_type}")
     mesh_dir = os.path.join(support_dir, f"{pose_name}/{video_name}/moyo_mesh")
 
     if not os.path.exists(image_out_dir): 
@@ -406,7 +406,7 @@ def json_to_4dgs_format(pose_name: str, video_name: str, old_json_file, new_json
     pose_file = os.path.join(support_dir, f"{data_folder}/{pose_name}/{video_name}.pkl")
     pp_params = pkl.load(open(pose_file, 'rb'))
 
-    width, height = 64, 64
+    width, height = 512, 512
     fov = np.pi / 3
     fx = width / (2 * np.tan(fov / 2))
 
@@ -432,8 +432,24 @@ def json_to_4dgs_format(pose_name: str, video_name: str, old_json_file, new_json
         pp_mesh.apply_translation(-pp_mesh.bounds.mean(axis=0))  # Center mesh at (0, 0, 0)
 
         # Set the camera transform
-        params = nerf_to_trimesh_camera(np.array(old_transforms['frames'][i]['transform_matrix']))
-        scene.set_camera(**params)
+        # params = nerf_to_trimesh_camera(np.array(old_transforms['frames'][i]['transform_matrix']))
+        # scene.set_camera(**params)
+
+        transform_matrix = np.array(old_transforms['frames'][i]['transform_matrix'])
+
+        # Optional: Adjust camera distance if the mesh is too big/small
+        # centroid = pp_mesh.bounds.mean(axis=0)  # Should be [0,0,0] if centered
+        # distance = np.linalg.norm(transform_matrix[:3, 3])  # Current camera distance
+        # transform_matrix[:3, 3] = transform_matrix[:3, 3] * (new_distance / distance)
+        # mesh_scale = mesh.extents.max()  # Measure mesh size
+
+        scene.camera_transform = transform_matrix
+
+        # # If the mesh is too large, move the camera back
+        # if mesh_scale > distance * 0.5:
+        #     new_distance = mesh_scale * 2.0  # Adjust as needed
+        #     transform_matrix[:3, 3] = transform_matrix[:3, 3] * (new_distance / distance)
+        #     scene.camera_transform = transform_matrix
 
         # scene.camera_transform = np.array(old_transforms['frames'][i]['transform_matrix'])
 
@@ -450,7 +466,7 @@ def json_to_4dgs_format(pose_name: str, video_name: str, old_json_file, new_json
             break
 
         transforms['camera_angle_x'] = scene.camera.fov[0]
-        transform_frame['file_path'] = f"./val/r_{i:03d}"
+        transform_frame['file_path'] = f"./{data_type}/r_{i:03d}"
         transform_frame['rotation'] = old_transforms['frames'][i]['rotation']  # one full circle divided by number of frames
         transform_frame['time'] = old_transforms['frames'][i]['time']
         transform_frame['transform_matrix'] = old_transforms['frames'][i]['transform_matrix']
@@ -461,5 +477,5 @@ def json_to_4dgs_format(pose_name: str, video_name: str, old_json_file, new_json
         json.dump(transforms, f, indent=2)
 
 
-if __name__ == "__main__":
-    export_to_colmap_bin("220923_yogi_body_hands_03596_Tree_Pose_or_Vrksasana", "-a_stageii")
+# if __name__ == "__main__":
+#     export_to_colmap_bin("220923_yogi_body_hands_03596_Tree_Pose_or_Vrksasana", "-a_stageii")
