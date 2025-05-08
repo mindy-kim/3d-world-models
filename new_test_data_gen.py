@@ -8,6 +8,8 @@ from moyo.eval.com_evaluation import smplx_to_mesh, visualize_mesh
 import pickle as pkl
 import cv2
 from pathlib import Path
+from utils import BasicPointCloud
+from plyfile import PlyData
 
 import pyglet
 import os
@@ -47,7 +49,7 @@ def export_to_colmap_format(pose_name: str, video_name: str):
     viewpoints = fibonacci_sphere(100)
     support_dir = 'data'
     data_folder = "mosh/train/"
-    width, height = 512, 512
+    width, height = W, H
     fov = np.pi / 3
     fx = width / (2 * np.tan(fov / 2))
     
@@ -93,12 +95,46 @@ def export_to_colmap_format(pose_name: str, video_name: str):
     for i, frame_ind in enumerate(range(num_frames)[50:-50:10]):
     # for frame_ind in tqdm(range(num_frames)[100:102]): #we'll probably have to tune this per video
         # frame_ind += 
+        # frames_from_start = (frame_ind - 50) // 10
+        # mesh = visualize_mesh(pp_body_model_output, faces, frame_id=frame_ind)
+        # mesh_path = os.path.join(mesh_dir, f"{pose_name}_t{frame_ind}.ply")
+
         frames_from_start = (frame_ind - 50) // 10
         mesh = visualize_mesh(pp_body_model_output, faces, frame_id=frame_ind)
+
+        # Compute per-vertex normals (if not already present)
+        if mesh.vertex_normals is None or len(mesh.vertex_normals) != len(mesh.vertices):
+            mesh.vertex_normals = mesh.vertex_normals  # triggers recomputation
+
+        # Assign normals
+        normals = mesh.vertex_normals
+
+        # Assign uniform color (e.g. light gray) or random color per vertex
+        # You can replace this with semantic labels, or texture color later
+        colors = np.ones_like(mesh.vertices) * 200  # RGB (200, 200, 200)
+
+        # Build new Trimesh with required vertex attributes
+        colored_mesh = trimesh.Trimesh(vertices=mesh.vertices,
+                                    faces=mesh.faces,
+                                    vertex_normals=normals,
+                                    vertex_colors=colors.astype(np.uint8),
+                                    process=False)
+
+        # Save in PLY format
         mesh_path = os.path.join(mesh_dir, f"{pose_name}_t{frame_ind}.ply")
+        colored_mesh.export(mesh_path)
 
         if i == 0:
-            mesh.export(mesh_path)
+            # mesh.export(mesh_path)
+            mesh_path = os.path.join(mesh_dir, f"{pose_name}_t{frame_ind}.ply")
+            colored_mesh.export(mesh_path)
+            plydata = PlyData.read(mesh_path)
+            vertices = plydata['vertex']
+            positions = np.vstack([vertices['x'], vertices['y'], vertices['z']]).T
+            colors = np.vstack([vertices['red'], vertices['green'], vertices['blue']]).T
+            normals = np.vstack([vertices['nx'], vertices['ny'], vertices['nz']]).T
+            x = BasicPointCloud(points=positions, colors=colors, normals=normals)
+            
         # ---------- B. write cameras.txt ----------
             cam_lines = ["# Camera list with one line of data per camera:\n"
                         "#   CAMERA_ID, MODEL, WIDTH, HEIGHT, PARAMS[]\n"
@@ -115,23 +151,26 @@ def export_to_colmap_format(pose_name: str, video_name: str):
             image_lines = img_hdr
             for i, C in enumerate(cam_centers, 1):
                 qvec, tvec = look_at(C)
-                image_name = f"render_{i:04d}.png"
+                image_name = f"frame{i:05d}.png"
                 image_lines.append(f"{i} {' '.join(map(str,qvec))} "
                                 f"{' '.join(map(str,tvec))} 1 {image_name}\n\n")
             (sparse_dir/"images.txt").write_text("".join(image_lines))
-
+            
             # ---------- D. write points3D.txt ----------
-            V = np.asarray(mesh.vertices)                   # (P,3)
+            V = np.asarray(mesh.vertices) 
+            C = colors                   # (P,3)
             pt_hdr = ["# 3D point list with one line per point:\n",
                     "#   POINT3D_ID, X, Y, Z, R, G, B, ERROR, TRACK[] as "
                     "(IMAGE_ID, POINT2D_IDX)\n",
                     f"# Number of points: {len(V)}, mean track length: {n_views}\n"]
             pt_lines = pt_hdr
-            for pid, xyz in enumerate(V, 1):
+            for pid, xyz in enumerate(V):
                 track = " ".join([f"{iid} 0" for iid in range(1, n_views+1)])
-                pt_lines.append(f"{pid} {xyz[0]} {xyz[1]} {xyz[2]} 255 255 255 0 {track}\n")
+                pt_lines.append(f"{pid + 1} {xyz[0]} {xyz[1]} {xyz[2]} {C[pid][0]} {C[pid][1]} {C[pid][2]} 0 {track}\n")
             (sparse_dir/"points3D.txt").write_text("".join(pt_lines))
-        
+
+            
+            import ipdb; ipdb.set_trace()
         # get viewpoints (fib sphere) for given timestep
         for i, view in enumerate(viewpoints):
             eye = view * 2.0
