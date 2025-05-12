@@ -313,63 +313,7 @@ def export_to_4dgs_format(pose_name: str, video_name: str, start_frame: int, end
 
 
 
-def nerf_to_trimesh_camera(transform_matrix):
-    """
-    Convert NeRF's transform_matrix (camera-to-world) into trimesh.set_camera() parameters,
-    but force the camera to look at (0, 0, 0).
 
-    Args:
-        transform_matrix (np.ndarray): 4x4 camera-to-world matrix from NeRF.
-        default_fov (float): Default field of view if not inferrable.
-
-    Returns:
-        dict: Parameters for trimesh.scene.Scene.set_camera().
-    """
-    # Extract camera position (translation part of the matrix)
-    camera_position = transform_matrix[:3, 3]
-
-    # Compute new rotation to look at origin
-    # Trimesh expects the camera to face -Z, so we compute a rotation that makes -Z point toward (0,0,0)
-    direction_to_origin = -camera_position  # Vector from camera to origin (flipped for look-at)
-    direction_to_origin_normalized = direction_to_origin / np.linalg.norm(direction_to_origin)
-
-    # Default "up" vector (Y-up, but you can adjust if needed)
-    up_vector = np.array([0, 1, 0])  # Y-up convention
-
-    # Compute rotation matrix that aligns -Z with direction_to_origin_normalized
-    rotation = rotation_matrix_lookat(direction_to_origin_normalized, up_vector)
-
-    # Convert rotation matrix to Euler angles (XYZ order)
-    angles = euler_from_matrix(rotation, 'sxyz')
-
-    # Distance is simply the norm from camera to origin
-    distance = np.linalg.norm(camera_position)
-
-    return {
-        'angles': angles,
-        'distance': distance,
-        'center': [0, 0, 0],  # Force look-at origin
-    }
-
-def rotation_matrix_lookat(target_dir, up_vector):
-    """
-    Compute a rotation matrix that makes -Z point along `target_dir`.
-    (Trimesh cameras face -Z, so we need to align -Z with the look direction.)
-    """
-    # Normalize target direction
-    target_dir = target_dir / np.linalg.norm(target_dir)
-
-    # Compute orthogonal axes
-    right = np.cross(up_vector, target_dir)
-    right = right / np.linalg.norm(right)
-    new_up = np.cross(target_dir, right)
-
-    # Construct rotation matrix (columns are right, up, -forward)
-    rotation = np.eye(4)
-    rotation[:3, 0] = right      # X-axis (right)
-    rotation[:3, 1] = new_up     # Y-axis (up)
-    rotation[:3, 2] = -target_dir  # Z-axis (-forward, since Trimesh faces -Z)
-    return rotation
 
 
 # Main processing
@@ -407,9 +351,7 @@ def json_to_4dgs_format(pose_name: str, video_name: str, old_json_file, new_json
     pp_params = pkl.load(open(pose_file, 'rb'))
 
     width, height = 512, 512
-    fov = np.pi / 3
-    fx = width / (2 * np.tan(fov / 2))
-
+    
     gender = 'neutral'
     pp_body_model_output, _, _, faces = smplx_to_mesh(
         pp_params,
@@ -419,8 +361,8 @@ def json_to_4dgs_format(pose_name: str, video_name: str, old_json_file, new_json
     )
 
     # get mesh per frame
-    for i in tqdm(range(len(transforms['frames']), len(old_transforms['frames']))):
-        pp_mesh = visualize_mesh(pp_body_model_output, faces, frame_id=i+50)
+    for i in tqdm(range(len(transforms['frames']), 2*len(old_transforms['frames']))): ###
+        pp_mesh = visualize_mesh(pp_body_model_output, faces, frame_id=i)
 
         mesh_path = os.path.join(mesh_dir, f"{pose_name}_t{i}.ply")
         pp_mesh.export(mesh_path)
@@ -431,31 +373,12 @@ def json_to_4dgs_format(pose_name: str, video_name: str, old_json_file, new_json
         scene = trimesh.Scene(pp_mesh)
         pp_mesh.apply_translation(-pp_mesh.bounds.mean(axis=0))  # Center mesh at (0, 0, 0)
 
-        # Set the camera transform
-        # params = nerf_to_trimesh_camera(np.array(old_transforms['frames'][i]['transform_matrix']))
-        # scene.set_camera(**params)
+        old_i = i - len(old_transforms['frames']) ###
+        # old_i = i
 
-        transform_matrix = np.array(old_transforms['frames'][i]['transform_matrix'])
-
-        # Optional: Adjust camera distance if the mesh is too big/small
-        # centroid = pp_mesh.bounds.mean(axis=0)  # Should be [0,0,0] if centered
-        # distance = np.linalg.norm(transform_matrix[:3, 3])  # Current camera distance
-        # transform_matrix[:3, 3] = transform_matrix[:3, 3] * (new_distance / distance)
-        # mesh_scale = mesh.extents.max()  # Measure mesh size
+        transform_matrix = np.array(old_transforms['frames'][old_i]['transform_matrix'])
 
         scene.camera_transform = transform_matrix
-
-        # # If the mesh is too large, move the camera back
-        # if mesh_scale > distance * 0.5:
-        #     new_distance = mesh_scale * 2.0  # Adjust as needed
-        #     transform_matrix[:3, 3] = transform_matrix[:3, 3] * (new_distance / distance)
-        #     scene.camera_transform = transform_matrix
-
-        # scene.camera_transform = np.array(old_transforms['frames'][i]['transform_matrix'])
-
-        # scene.set_camera(angles=view, distance=2.5)
-        # cam_to_world = trimesh_to_nerf_transform(scene.camera_transform)
-        # cam_to_world = scene.camera_transform
 
         try:
             png = scene.save_image(resolution=(width, height))
@@ -465,11 +388,11 @@ def json_to_4dgs_format(pose_name: str, video_name: str, old_json_file, new_json
         except Exception as e:
             break
 
-        transforms['camera_angle_x'] = scene.camera.fov[0]
+        transforms['camera_angle_x'] = old_transforms['camera_angle_x']
         transform_frame['file_path'] = f"./{data_type}/r_{i:03d}"
-        transform_frame['rotation'] = old_transforms['frames'][i]['rotation']  # one full circle divided by number of frames
-        transform_frame['time'] = old_transforms['frames'][i]['time']
-        transform_frame['transform_matrix'] = old_transforms['frames'][i]['transform_matrix']
+        transform_frame['rotation'] = old_transforms['frames'][old_i]['rotation']  # one full circle divided by number of frames
+        transform_frame['time'] = (old_transforms['frames'][old_i]['time'] / 2) + 0.5 + transforms['frames'][1]['time'] ###
+        transform_frame['transform_matrix'] = old_transforms['frames'][old_i]['transform_matrix']
 
         transforms['frames'].append(transform_frame)
 
