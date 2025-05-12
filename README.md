@@ -38,7 +38,7 @@ We follow the [same instructions as provided by 4DGS](https://github.com/hustvl/
 To train on the aforementioned `moyo` dataset in the standard action-conditioned task, we run the following:
 
 ```bash
-python train2.py -s data/moyo-boat-pose -z data/moyo-side-plank --port 6017 --expname "moyo/boat-pose" --configs arguments/dnerf/moyo-boat-pose.py 
+python train.py -s data/moyo-boat-pose -z data/moyo-side-plank --port 6017 --expname "moyo/boat-pose" --configs arguments/dnerf/moyo-boat-pose.py 
 ```
 
 ## Visualization
@@ -46,6 +46,6 @@ python train2.py -s data/moyo-boat-pose -z data/moyo-side-plank --port 6017 --ex
 Then, to render, we run:
 
 ```bash
-python render2.py --model_path "output/moyo/boat-pose/"  --skip_test --configs arguments/dnerf/moyo-boat-pose.py
+python render.py --model_path "output/moyo/boat-pose/"  --skip_test --configs arguments/dnerf/moyo-boat-pose.py
 ```
 
