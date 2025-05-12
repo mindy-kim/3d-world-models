@@ -2,6 +2,8 @@
 
 Gaurav Suhas Gaonkar, Mindy Kim, Preetish Juneja, Bumjin Joo
 
+This work is heavily built upon the [original 4DGaussians project](https://github.com/hustvl/4DGaussians/tree/master)
+
 ## Installation
 
 We follow the standard 3DGS setup scheme.
